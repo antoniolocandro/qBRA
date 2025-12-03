@@ -1,7 +1,6 @@
 [general]
 name=qBRA ILS LLZ (Single Frequency)
-qgisMinimumVersion=3.44
-qgisMaximumVersion=3.999
+qgisMinimumVersion=3.0
 version=0.1.1
 author=andures
 email=
