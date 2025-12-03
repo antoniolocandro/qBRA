@@ -1,0 +1,34 @@
+# This file contains metadata for your plugin.
+
+[general]
+name=QBRA ILS/LLZ
+qgisMinimumVersion=3.0
+description=QBRA Plugin for QGIS - BRA areas for ILS/LLZ single frequency
+version=0.1.0
+author=andures
+email=
+
+about=Generates BRA areas (base, left/right level, slope, walls) from a selected navaid feature, preserving legacy calculations.
+
+tracker=
+repository=
+# End of mandatory metadata
+
+# Recommended items:
+
+hasProcessingProvider=no
+changelog=Version 0.1.0
+	- Initial ILS/LLZ BRA dock UI
+	- Plugin scaffold aligned to qpansopy style
+	- Legacy calculations preserved
+
+tags=python, aviation, ILS, LLZ, BRA, surfaces
+
+homepage=
+category=Plugins
+icon=icons/ils_llz.svg
+# experimental flag
+experimental=False
+
+# deprecated flag (applies to the whole plugin, not just a single version)
+deprecated=False
