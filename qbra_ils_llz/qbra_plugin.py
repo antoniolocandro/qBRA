@@ -28,6 +28,13 @@ class QbraIlsLlzPlugin:
 
     def run(self):
         try:
+            # UI to select parameters (no hardcoded values)
+            from .ui.navaid_dialog import NavaidDialog
+            dlg = NavaidDialog(self.iface.mainWindow())
+            if dlg.exec_() != dlg.Accepted:
+                return
+            navaid = dlg.selected_navaid()
+
             # Validar contexto de capas y selección
             layers = list(QgsProject.instance().mapLayers().values())
             routing_layer = None
@@ -74,8 +81,7 @@ class QbraIlsLlzPlugin:
             map_srid = self.iface.mapCanvas().mapSettings().destinationCrs().authid()
 
             # Parámetros iniciales
-            navaid = 'DME'  # conservamos el valor por defecto del script viejo
-            a = d0  # comportamiento original cuando navaid es LOC/LOCII; se ajusta dentro de compute_parameters
+            a = d0  # compute_parameters ajustará según navaid
 
             # Construir capas con la lógica pythonizada, manteniendo cálculos
             from .module.ils_llz_logic import build_layers
