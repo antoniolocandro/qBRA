@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>IlsLlzDockWidgetBase</class>
+ <widget class="QDockWidget" name="IlsLlzDockWidgetBase">
+  <property name="windowTitle">
+   <string>qBRA ILS/LLZ</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="labelTitle">
+      <property name="text">
+       <string>ILS/LLZ Single Frequency</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QFrame" name="line">
+      <property name="frameShape">
+       <enum>QFrame::HLine</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Sunken</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupBoxInputs">
+      <property name="title">
+       <string>Input Layers</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayoutInputs">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayoutRouting">
+         <item>
+          <widget class="QLabel" name="labelRouting">
+           <property name="text">
+            <string>Runway Layer:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboRouting"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkRoutingSelected">
+           <property name="text">
+            <string>Selected Only</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayoutNavaid">
+         <item>
+          <widget class="QLabel" name="labelNavaid">
+           <property name="text">
+            <string>Navaid Layer:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboNavaid"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkNavaidSelected">
+           <property name="text">
+            <string>Selected Only</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupBoxParams">
+      <property name="title">
+       <string>Parameters</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayoutParams">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayoutNavaidType">
+         <item>
+          <widget class="QLabel" name="labelNavaidType">
+           <property name="text">
+            <string>Approach Type:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboNavaidType">
+           <item><property name="text"><string>LOC</string></property></item>
+           <item><property name="text"><string>LOCII</string></property></item>
+           <item><property name="text"><string>GP</string></property></item>
+           <item><property name="text"><string>DME</string></property></item>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayoutButtons">
+      <item>
+       <widget class="QPushButton" name="btnDirection">
+        <property name="text"><string>Direction: Start to End</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="spacer">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeType"><enum>QSizePolicy::Expanding</enum></property>
+        <property name="sizeHint"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnCalculate">
+        <property name="text"><string>Calculate</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnClose">
+        <property name="text"><string>Close</string></property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

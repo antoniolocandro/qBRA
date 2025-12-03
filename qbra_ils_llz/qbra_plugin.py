@@ -16,7 +16,7 @@ class QbraIlsLlzPlugin:
     def initGui(self):
         icon_path = os.path.join(self.plugin_dir, 'resources', 'icon.png')
         self.action = QAction(QIcon(icon_path), self.tr('ILS LLZ (Single Freq)'), self.iface.mainWindow())
-        self.action.setToolTip(self.tr('Ejecutar cálculo ILS LLZ'))
+        self.action.setToolTip(self.tr('Abrir panel ILS/LLZ'))
         self.action.triggered.connect(self.run)
         self.iface.addToolBarIcon(self.action)
         self.iface.addPluginToMenu(self.tr('qBRA'), self.action)
@@ -28,12 +28,13 @@ class QbraIlsLlzPlugin:
 
     def run(self):
         try:
-            # UI to select parameters (no hardcoded values)
-            from .ui.navaid_dialog import NavaidDialog
-            dlg = NavaidDialog(self.iface.mainWindow())
-            if dlg.exec_() != dlg.Accepted:
-                return
-            navaid = dlg.selected_navaid()
+            # Abrir DockWidget anclado a la derecha, estilo qOLS
+            from .ui.ils_llz_dockwidget import IlsLlzDockWidget
+            dock = IlsLlzDockWidget(self.iface.mainWindow())
+            dock.closingPlugin.connect(lambda: None)
+            self.iface.addDockWidget(Qt.RightDockWidgetArea, dock)
+            dock.show()
+            return
 
             # Validar contexto de capas y selección
             layers = list(QgsProject.instance().mapLayers().values())
