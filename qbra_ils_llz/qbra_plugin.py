@@ -38,6 +38,11 @@ class QbraPlugin(QObject):
             self._dock.calculateRequested.connect(self._on_calculate)
             self._dock.closedRequested.connect(lambda: self._dock.hide())
             self.iface.addDockWidget(self._dock.defaultArea(), self._dock)
+        # refresh layers each time we open to reflect current project state
+        try:
+            self._dock.refresh_layers()
+        except Exception:
+            pass
         self._dock.show()
         self._dock.raise_()
 
