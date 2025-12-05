@@ -29,12 +29,16 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.btnClose.clicked.connect(lambda: self.closedRequested.emit())
         self._widget.btnCalculate.clicked.connect(lambda: self.calculateRequested.emit())
         self._widget.btnDirection.clicked.connect(self._toggle_direction)
+        # Default direction: start to end
+        self._widget.btnDirection.setProperty("direction", "forward")
+        self._widget.btnDirection.setText("Direction: Start to End")
 
     def _toggle_direction(self):
         current = self._widget.btnDirection.property("direction") or "forward"
         new = "backward" if current == "forward" else "forward"
         self._widget.btnDirection.setProperty("direction", new)
-        self._widget.btnDirection.setText("Backward" if new == "backward" else "Forward")
+        label = "Direction: End to Start" if new == "backward" else "Direction: Start to End"
+        self._widget.btnDirection.setText(label)
 
     def refresh_layers(self):
         """Fill navaid (point) and routing (line) combos from layers in the canvas.
@@ -120,10 +124,13 @@ class IlsLlzDockWidget(QDockWidget):
             print("QBRA ILS/LLZ: routing geometry has insufficient vertices")
             return None
 
-        start_point = QgsPoint(pts[0])
-        end_point = QgsPoint(pts[-1])
+        # Apply direction setting to routing points
+        direction = self._widget.btnDirection.property("direction") or "forward"
+        ordered_pts = pts if direction == "forward" else list(reversed(pts))
+        start_point = QgsPoint(ordered_pts[0])
+        end_point = QgsPoint(ordered_pts[-1])
         azimuth = start_point.azimuth(end_point)
-        print(f"QBRA ILS/LLZ: azimuth={azimuth}, d0={geom.length()}")
+        print(f"QBRA ILS/LLZ: direction={direction}, azimuth={azimuth}, d0={geom.length()}")
 
         # Parameters preset for DME case (from legacy script)
         a = 300
@@ -147,5 +154,6 @@ class IlsLlzDockWidget(QDockWidget):
             "L": L,
             "phi": phi,
             "remark": remark,
+            "direction": direction,
             "site_elev": site_elev,
         }
