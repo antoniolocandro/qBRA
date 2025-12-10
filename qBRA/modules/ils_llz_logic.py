@@ -16,7 +16,7 @@ from qgis.PyQt.QtGui import QColor
 # Keep formulas and geometry construction identical to legacy script.
 
 def build_layers(iface, params):
-    # params expected keys: active_layer, azimuth, a, b, h, r, D, H, L, phi, remark, site_elev, direction
+    # params expected keys: active_layer, azimuth, a, b, h, r, D, H, L, phi, remark, site_elev
     layer = params["active_layer"]
     selection = layer.selectedFeatures()
     if not selection:
@@ -42,21 +42,14 @@ def build_layers(iface, params):
     L = params["L"]
     phi = params["phi"]
     azimuth = params["azimuth"]
-    direction = params.get("direction", "forward")
     remark = params["remark"]
     site_elev = params["site_elev"]
 
     side_elev = site_elev + H
 
-    # Points
-    # Respect direction: forward means along azimuth, backward swaps front/back construction
-    if direction == "forward":
-        pt_f = p_geom.project(a, azimuth)
-        pt_b = p_geom.project(b, azimuth - 180)
-    else:
-        # Reverse: swap sense by flipping azimuth
-        pt_f = p_geom.project(a, azimuth - 180)
-        pt_b = p_geom.project(b, azimuth)
+    # Points (direction is encoded solely by azimuth)
+    pt_f = p_geom.project(a, azimuth)
+    pt_b = p_geom.project(b, azimuth - 180)
 
     pt_al = pt_f.project(D, azimuth - 90)
     pt_ar = pt_f.project(D, azimuth + 90)
