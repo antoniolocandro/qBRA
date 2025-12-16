@@ -207,6 +207,9 @@ class IlsLlzDockWidget(QDockWidget):
         H = float(self._widget.spnH.value())
         L = float(self._widget.spnL.value())
         phi = float(self._widget.spnPhi.value())
+        # Facility type (key) and label
+        facility_key = self._widget.cboFacility.currentData()
+        facility_label = self._widget.cboFacility.currentText()
 
         return {
             "active_layer": navaid_layer,
@@ -222,4 +225,6 @@ class IlsLlzDockWidget(QDockWidget):
             "remark": remark,
             "direction": direction,
             "site_elev": site_elev,
+            "facility_key": facility_key,
+            "facility_label": facility_label,
         }
