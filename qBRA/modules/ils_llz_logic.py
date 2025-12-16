@@ -84,7 +84,6 @@ def build_layers(iface, params):
         QgsField("area", QVariant.String),
         QgsField("max_elev", QVariant.String),
         QgsField("area_name", QVariant.String),
-        QgsField("type", QVariant.String),
         QgsField("a", QVariant.String),
         QgsField("b", QVariant.String),
         QgsField("h", QVariant.String),
@@ -93,6 +92,8 @@ def build_layers(iface, params):
         QgsField("H", QVariant.String),
         QgsField("L", QVariant.String),
         QgsField("phi", QVariant.String),
+        # Place 'type' as the last attribute per user request
+        QgsField("type", QVariant.String),
     ]
     z_layer.dataProvider().addAttributes(fields)
     z_layer.updateFields()
@@ -110,7 +111,6 @@ def build_layers(iface, params):
         "base",
         str(site_elev),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -119,6 +119,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -131,7 +132,6 @@ def build_layers(iface, params):
         "left level",
         str(side_elev),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -140,6 +140,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -152,7 +153,6 @@ def build_layers(iface, params):
         "right level",
         str(side_elev),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -161,6 +161,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -188,7 +189,6 @@ def build_layers(iface, params):
         "slope",
         str(site_elev + h),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -197,6 +197,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -209,7 +210,6 @@ def build_layers(iface, params):
         "wall",
         str(side_elev),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -218,6 +218,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -229,7 +230,6 @@ def build_layers(iface, params):
         "wall",
         str(side_elev),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -238,6 +238,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -249,7 +250,6 @@ def build_layers(iface, params):
         "wall",
         str(side_elev),
         remark,
-        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -258,6 +258,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
