@@ -98,6 +98,9 @@ def build_layers(iface, params):
     z_layer.updateFields()
     pr = z_layer.dataProvider()
 
+    # Facility label preferred for 'type' attribute (falls back to key)
+    _type_value = params.get("facility_label") or params.get("facility_key") or ""
+
     # Base
     base = [pz(pt_bl, site_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev), pz(pt_al, site_elev), pz(pt_bl, site_elev)]
     seg = QgsFeature()
@@ -107,7 +110,7 @@ def build_layers(iface, params):
         "base",
         str(site_elev),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -128,7 +131,7 @@ def build_layers(iface, params):
         "left level",
         str(side_elev),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -149,7 +152,7 @@ def build_layers(iface, params):
         "right level",
         str(side_elev),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -185,7 +188,7 @@ def build_layers(iface, params):
         "slope",
         str(site_elev + h),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -206,7 +209,7 @@ def build_layers(iface, params):
         "wall",
         str(side_elev),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -226,7 +229,7 @@ def build_layers(iface, params):
         "wall",
         str(side_elev),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
@@ -246,7 +249,7 @@ def build_layers(iface, params):
         "wall",
         str(side_elev),
         remark,
-        params.get("facility_key") or params.get("facility_label") or "",
+        _type_value,
         str(round(a, 2)),
         str(b),
         str(h),
