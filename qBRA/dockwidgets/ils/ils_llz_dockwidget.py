@@ -207,6 +207,9 @@ class IlsLlzDockWidget(QDockWidget):
         H = float(self._widget.spnH.value())
         L = float(self._widget.spnL.value())
         phi = float(self._widget.spnPhi.value())
+        # Facility type (key) and label
+        facility_key = self._widget.cboFacility.currentData()
+        facility_label = self._widget.cboFacility.currentText()
 
         # Facility type (key) and label for naming
         facility_key = self._widget.cboFacility.currentData()
@@ -233,5 +236,4 @@ class IlsLlzDockWidget(QDockWidget):
             "site_elev": site_elev,
             "facility_key": facility_key,
             "facility_label": facility_label,
-            "display_name": display_name,
         }

@@ -93,10 +93,15 @@ def build_layers(iface, params):
         QgsField("H", QVariant.String),
         QgsField("L", QVariant.String),
         QgsField("phi", QVariant.String),
+        # Place 'type' as the last attribute per user request
+        QgsField("type", QVariant.String),
     ]
     z_layer.dataProvider().addAttributes(fields)
     z_layer.updateFields()
     pr = z_layer.dataProvider()
+
+    # Facility label preferred for 'type' attribute (falls back to key)
+    _type_value = params.get("facility_label") or params.get("facility_key") or ""
 
     # Base
     base = [pz(pt_bl, site_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev), pz(pt_al, site_elev), pz(pt_bl, site_elev)]
@@ -115,6 +120,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -135,6 +141,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -155,6 +162,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -190,6 +198,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -210,6 +219,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -229,6 +239,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 
@@ -248,6 +259,7 @@ def build_layers(iface, params):
         str(H),
         str(L),
         str(phi),
+        _type_value,
     ])
     pr.addFeatures([seg])
 

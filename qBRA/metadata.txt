@@ -26,7 +26,7 @@ tags=python, aviation, ILS, LLZ, BRA, surfaces
 
 homepage=
 category=Plugins
-icon=icons/ils_llz.svg
+icon=icons/qbra.svg
 # experimental flag
 experimental=False
 
