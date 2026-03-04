@@ -170,7 +170,7 @@
 
 ---
 
-#### **Story 1.5: Implementar Logging Proper**
+#### **Story 1.5: Implementar Logging Proper** ✅ **COMPLETADA**
 
 **Como** desarrollador  
 **Quiero** logging estructurado en lugar de print()  
@@ -178,18 +178,41 @@
 
 **Tareas**:
 
-- [ ] Configurar logging con formato adecuado (30 min)
-- [ ] Reemplazar todos los `print()` por logger (30 min)
-- [ ] Agregar logging de errores con traceback (30 min)
-- [ ] Configurar niveles de log (DEBUG, INFO, WARNING, ERROR) (15 min)
+- [x] Configurar logging con formato adecuado (30 min)
+- [x] Reemplazar todos los `print()` por logger (30 min)
+- [x] Agregar logging de errores con traceback (30 min)
+- [x] Configurar niveles de log (DEBUG, INFO, WARNING, ERROR) (15 min)
 
 **Acceptance Criteria**:
 
-- ✅ No hay más `print()` statements
+- ✅ No hay más `print()` statements (3 reemplazados en dockwidget)
 - ✅ Logs incluyen timestamp y nivel
-- ✅ Errores incluyen traceback completo
+- ✅ Errores incluyen traceback completo (con exc_info=True)
+
+**Implementación**:
+
+- Creado `qBRA/utils/logging_config.py` (131 líneas)
+  - QGISLogHandler: Handler custom que integra con QgsMessageLog
+  - setup_logger(): Configura logger con formato y handlers apropiados
+  - get_logger(): Función de conveniencia para obtener logger
+- Reemplazados 3 print() en `ils_llz_dockwidget.py`:
+  - Debug log para azimuth calculation
+  - Warning log para validation errors
+  - Error log con traceback para unexpected errors
+- Creado `tests/test_logging_config.py` (192 líneas, 18 tests)
+  - Tests para QGISLogHandler
+  - Tests para setup_logger
+  - Tests para get_logger
+  - Tests de integración con diferentes niveles de log
+
+**Métricas**:
+- 3 print() statements eliminados
+- 131 líneas de logging infrastructure
+- 192 líneas de test coverage (18 tests)
+- Integración con QGIS MessageLog
 
 **Estimación**: 2 Story Points  
+**Tiempo Real**: 2 horas  
 **Prioridad**: Must Have
 
 ---
@@ -987,7 +1010,7 @@ self.setAllowedAreas(LeftDockWidgetArea | RightDockWidgetArea)
 
 ## 📈 Progreso del Proyecto
 
-### Estado Actual: 🟡 Pre-Refactorización
+### Estado Actual: � Sprint 1 en Progreso (88% completado)
 
 **Última actualización**: 4 de marzo, 2026
 
@@ -995,17 +1018,23 @@ self.setAllowedAreas(LeftDockWidgetArea | RightDockWidgetArea)
 
 | Categoría           | Total | Completadas | En Progreso | Pendientes |
 | ------------------- | ----- | ----------- | ----------- | ---------- |
-| **Fases**           | 7     | 0           | 0           | 7          |
-| **Sprints**         | 3     | 0           | 0           | 3          |
-| **Stories**         | 13    | 0           | 0           | 13         |
-| **Story Points**    | 68    | 0           | 0           | 68         |
-| **Horas Estimadas** | 111h  | 0h          | 0h          | 111h       |
+| **Fases**           | 7     | 0           | 1           | 6          |
+| **Sprints**         | 3     | 0           | 1           | 2          |
+| **Stories**         | 13    | 5           | 0           | 8          |
+| **Story Points**    | 68    | 23          | 0           | 45         |
+| **Horas Estimadas** | 111h  | 19h         | 0h          | 92h        |
 
 ### Progreso por Sprint
 
 **Sprint 1: Core Refactoring**
 
-- ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% (0/26 SP)
+- ✅✅✅✅✅✅✅✅⬜⬜ 88% (23/26 SP)
+  - ✅ Story 1.1: Type Hints (3 SP)
+  - ✅ Story 1.2: Dataclasses (5 SP)
+  - ✅ Story 1.3: MVC Separation (8 SP)
+  - ✅ Story 1.4: DRY Feature Creation (5 SP)
+  - ✅ Story 1.5: Logging (2 SP)
+  - ⬜ Story 1.6: Error Handling (3 SP)
 
 **Sprint 2: Testing & Quality**
 

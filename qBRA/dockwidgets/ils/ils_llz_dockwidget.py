@@ -11,6 +11,10 @@ import os
 from ...models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
 from ...services.validation_service import ValidationService, ValidationError
 from ...services.layer_service import LayerService
+from ...utils.logging_config import get_logger
+
+# Module logger
+logger = get_logger(__name__)
 
 UI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ui", "ils", "ils_llz_panel.ui")
 
@@ -236,7 +240,10 @@ class IlsLlzDockWidget(QDockWidget):
             end_point = QgsPoint(ordered_pts[-1])
             azimuth = start_point.azimuth(end_point)
             
-            print(f"QBRA ILS/LLZ: direction={direction}, azimuth={azimuth}, d0={geom.length()}")
+            logger.debug(
+                "Calculated azimuth from routing geometry: direction=%s, azimuth=%.2f, distance=%.2f",
+                direction, azimuth, geom.length()
+            )
             
             # Parameters come from UI (facility defaults applied on selection)
             a = float(self._widget.spnA.value())
@@ -278,8 +285,8 @@ class IlsLlzDockWidget(QDockWidget):
             )
             
         except (ValidationError, ValueError) as e:
-            print(f"QBRA ILS/LLZ: Validation failed - {e}")
+            logger.warning("Parameter validation failed: %s", e)
             return None
         except Exception as e:
-            print(f"QBRA ILS/LLZ: Unexpected error - {e}")
+            logger.error("Unexpected error while extracting parameters: %s", e, exc_info=True)
             return None
