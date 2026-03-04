@@ -9,6 +9,13 @@ import pytest
 from typing import Any, Dict
 from unittest.mock import Mock, MagicMock
 
+# Import dataclass models for fixtures
+try:
+    from qBRA.models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
+    MODELS_AVAILABLE = True
+except ImportError:
+    MODELS_AVAILABLE = False
+
 
 # ============================================================================
 # QGIS Mock Fixtures
@@ -65,52 +72,63 @@ def mock_qgs_feature() -> Mock:
 # ============================================================================
 
 @pytest.fixture
-def sample_bra_parameters() -> Dict[str, Any]:
-    """
-    Sample BRA parameters for testing.
+def sample_bra_parameters():
+    """Sample BRA parameters for testing.
     
     Returns:
-        Dictionary with valid BRA calculation parameters.
+        BRAParameters dataclass instance with valid calculation parameters.
     """
-    return {
-        "a": 1000.0,
-        "b": 500.0,
-        "h": 70.0,
-        "r": 7000.0,
-        "D": 500.0,
-        "H": 10.0,
-        "L": 2300.0,
-        "phi": 30.0,
-        "azimuth": 90.0,
-        "site_elev": 100.0,
-        "remark": "RWY09",
-        "direction": "forward",
-        "facility_key": "LOC",
-        "facility_label": "ILS LLZ – single frequency",
-    }
+    if not MODELS_AVAILABLE:
+        pytest.skip("qBRA models not available")
+    
+    # Create a mock layer for testing
+    mock_layer = Mock()
+    mock_layer.name.return_value = "TestNavaidLayer"
+    mock_layer.selectedFeatures.return_value = [Mock()]
+    
+    return BRAParameters(
+        active_layer=mock_layer,
+        a=1000.0,
+        b=500.0,
+        h=70.0,
+        r=7000.0,
+        D=500.0,
+        H=10.0,
+        L=2300.0,
+        phi=30.0,
+        azimuth=90.0,
+        site_elev=100.0,
+        remark="RWY09",
+        direction="forward",
+        facility_key="LOC",
+        facility_label="ILS LLZ – single frequency",
+    )
 
 
 @pytest.fixture
-def sample_facility_config() -> Dict[str, Any]:
-    """
-    Sample facility configuration for testing.
+def sample_facility_config():
+    """Sample facility configuration for testing.
     
     Returns:
-        Dictionary with facility defaults.
+        FacilityConfig dataclass instance with defaults.
     """
-    return {
-        "label": "ILS LLZ – single frequency",
-        "a_dependent": True,
-        "defaults": {
-            "b": 500,
-            "h": 70,
-            "D": 500,
-            "H": 10,
-            "L": 2300,
-            "phi": 30,
-            "r_expr": "a+6000",
-        },
-    }
+    if not MODELS_AVAILABLE:
+        pytest.skip("qBRA models not available")
+    
+    return FacilityConfig(
+        key="LOC",
+        label="ILS LLZ – single frequency",
+        a_depends_on_threshold=True,
+        defaults=FacilityDefaults(
+            b=500,
+            h=70,
+            D=500,
+            H=10,
+            L=2300,
+            phi=30,
+            r_expr="a+6000",
+        ),
+    )
 
 
 # ============================================================================

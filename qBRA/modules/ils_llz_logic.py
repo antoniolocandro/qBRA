@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union
+from typing import Any, Union
 
 from qgis.core import (
     QgsVectorLayer,
@@ -15,15 +15,16 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 
+from ..models.bra_parameters import BRAParameters
+
 # Keep formulas and geometry construction identical to legacy script.
 
-def build_layers(iface: Any, params: Dict[str, Any]) -> QgsVectorLayer:
+def build_layers(iface: Any, params: BRAParameters) -> QgsVectorLayer:
     """Build BRA (Building Restriction Areas) vector layer with polygons.
     
     Args:
         iface: QGIS interface object
-        params: Dictionary containing all calculation parameters (active_layer, azimuth,
-                a, b, h, r, D, H, L, phi, remark, site_elev, etc.)
+        params: BRAParameters dataclass with all calculation parameters
     
     Returns:
         QgsVectorLayer with BRA polygon features
@@ -31,8 +32,8 @@ def build_layers(iface: Any, params: Dict[str, Any]) -> QgsVectorLayer:
     Raises:
         ValueError: If no feature is selected on the active layer
     """
-    # params expected keys: active_layer, azimuth, a, b, h, r, D, H, L, phi, remark, site_elev
-    layer = params["active_layer"]
+    # Extract parameters from dataclass
+    layer = params.active_layer
     selection = layer.selectedFeatures()
     if not selection:
         raise ValueError("Select one feature on the active layer")
@@ -57,18 +58,18 @@ def build_layers(iface: Any, params: Dict[str, Any]) -> QgsVectorLayer:
         cPoint.setZ(z)
         return cPoint
 
-    a = params["a"]
-    b = params["b"]
-    h = params["h"]
-    r = params["r"]
-    D = params["D"]
-    H = params["H"]
-    L = params["L"]
-    phi = params["phi"]
-    azimuth = params["azimuth"]
-    remark = params["remark"]
-    display_name = params.get("display_name") or remark
-    site_elev = params["site_elev"]
+    a = params.a
+    b = params.b
+    h = params.h
+    r = params.r
+    D = params.D
+    H = params.H
+    L = params.L
+    phi = params.phi
+    azimuth = params.azimuth
+    remark = params.remark
+    display_name = params.display_name or params.remark
+    site_elev = params.site_elev
 
     side_elev = site_elev + H
 
@@ -125,7 +126,7 @@ def build_layers(iface: Any, params: Dict[str, Any]) -> QgsVectorLayer:
     pr = z_layer.dataProvider()
 
     # Facility label preferred for 'type' attribute (falls back to key)
-    _type_value = params.get("facility_label") or params.get("facility_key") or ""
+    _type_value = params.facility_label or params.facility_key or ""
 
     # Base
     base = [pz(pt_bl, site_elev), pz(pt_br, site_elev), pz(pt_ar, site_elev), pz(pt_al, site_elev), pz(pt_bl, site_elev)]

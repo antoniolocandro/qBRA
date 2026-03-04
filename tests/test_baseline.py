@@ -56,15 +56,15 @@ class TestFixtures:
     def test_sample_bra_parameters_fixture(self, sample_bra_parameters):
         """Verify sample BRA parameters fixture works."""
         assert sample_bra_parameters is not None
-        assert "a" in sample_bra_parameters
-        assert "b" in sample_bra_parameters
-        assert sample_bra_parameters["a"] == 1000.0
+        assert hasattr(sample_bra_parameters, 'a')
+        assert hasattr(sample_bra_parameters, 'b')
+        assert sample_bra_parameters.a == 1000.0
 
     def test_sample_facility_config_fixture(self, sample_facility_config):
         """Verify sample facility config fixture works."""
         assert sample_facility_config is not None
-        assert "label" in sample_facility_config
-        assert "defaults" in sample_facility_config
+        assert hasattr(sample_facility_config, 'label')
+        assert hasattr(sample_facility_config, 'defaults')
 
 
 class TestImports:

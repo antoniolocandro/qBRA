@@ -1,6 +1,6 @@
 """QGIS Plugin main class for qBRA."""
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional
 import os
 
 from qgis.PyQt.QtCore import QObject
@@ -10,6 +10,7 @@ from qgis.core import Qgis, QgsProject, QgsVectorLayer
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
 from .modules.ils_llz_logic import build_layers
+from .models.bra_parameters import BRAParameters
 
 
 class QbraPlugin(QObject):
@@ -76,7 +77,7 @@ class QbraPlugin(QObject):
 
     def _on_calculate(self) -> None:
         """Handle calculate button click from dock widget."""
-        params: Optional[Dict[str, Any]] = self._dock.get_parameters() if self._dock else None
+        params: Optional[BRAParameters] = self._dock.get_parameters() if self._dock else None
         if not params:
             self.iface.messageBar().pushMessage("QBRA", "Invalid inputs", level=Qgis.Warning)
             return

@@ -8,13 +8,15 @@ from qgis.utils import iface
 
 import os
 
+from ...models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
+
 UI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ui", "ils", "ils_llz_panel.ui")
 
 class IlsLlzDockWidget(QDockWidget):
     calculateRequested = pyqtSignal()
     closedRequested = pyqtSignal()
     
-    _facility_defs: Dict[str, Tuple[str, bool, Dict[str, Any]]]
+    _facility_defs: Dict[str, FacilityConfig]
 
     def __init__(self, iface_: Any) -> None:
         """Initialize the ILS/LLZ dock widget.
@@ -52,16 +54,35 @@ class IlsLlzDockWidget(QDockWidget):
     def _init_facility(self) -> None:
         """Initialize facility type dropdown with predefined configurations."""
         self._facility_defs = {
-            # key: (label, a_depends_threshold, defaults)
-            "LOC": ("ILS LLZ – single frequency", True, {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
-            "LOCII": ("ILS LLZ – dual frequency", True, {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
-            "GP": ("ILS GP M-Type (dual)", False, {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
-            "DME": ("DME (directional)", True, {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
+            "LOC": FacilityConfig(
+                key="LOC",
+                label="ILS LLZ – single frequency",
+                a_depends_on_threshold=True,
+                defaults=FacilityDefaults(b=500, h=70, D=500, H=10, L=2300, phi=30, r_expr="a+6000")
+            ),
+            "LOCII": FacilityConfig(
+                key="LOCII",
+                label="ILS LLZ – dual frequency",
+                a_depends_on_threshold=True,
+                defaults=FacilityDefaults(b=500, h=70, D=500, H=20, L=1500, phi=20, r_expr="a+6000")
+            ),
+            "GP": FacilityConfig(
+                key="GP",
+                label="ILS GP M-Type (dual)",
+                a_depends_on_threshold=False,
+                defaults=FacilityDefaults(a=800, b=50, h=70, D=250, H=5, L=325, phi=10, r=6000)
+            ),
+            "DME": FacilityConfig(
+                key="DME",
+                label="DME (directional)",
+                a_depends_on_threshold=True,
+                defaults=FacilityDefaults(b=20, h=70, D=600, H=20, L=1500, phi=40, r_expr="a+6000")
+            ),
         }
         cb = self._widget.cboFacility
         cb.clear()
-        for key, (label, _dep, _defs) in self._facility_defs.items():
-            cb.addItem(label, key)
+        for key, config in self._facility_defs.items():
+            cb.addItem(config.label, key)
         cb.currentIndexChanged.connect(self._apply_facility_defaults)
         # Update r when A changes for types where r depends on a
         self._widget.spnA.valueChanged.connect(self._maybe_update_r)
@@ -72,8 +93,11 @@ class IlsLlzDockWidget(QDockWidget):
     def _maybe_update_r(self) -> None:
         """Update r parameter based on facility type if it depends on a."""
         key = self._widget.cboFacility.currentData()
-        defs: Dict[str, Any] = self._facility_defs.get(key, (None, False, {}))[2]
-        r_expr = defs.get("r_expr")
+        config = self._facility_defs.get(key)
+        if config is None:
+            return
+        
+        r_expr = config.defaults.r_expr
         if r_expr == "a+6000":
             a = float(self._widget.spnA.value())
             self._widget.spnr.setValue(a + 6000.0)
@@ -81,13 +105,14 @@ class IlsLlzDockWidget(QDockWidget):
     def _apply_facility_defaults(self) -> None:
         """Apply default parameter values based on the selected facility type."""
         key = self._widget.cboFacility.currentData()
-        label: str
-        a_dep: bool
-        defs: Dict[str, Any]
-        label, a_dep, defs = self._facility_defs.get(key, ("", False, {}))
+        config = self._facility_defs.get(key)
+        if config is None:
+            return
+        
+        defs = config.defaults
         # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
-        if "a" in defs:
-            self._widget.spnA.setValue(float(defs["a"]))
+        if defs.a is not None:
+            self._widget.spnA.setValue(float(defs.a))
         else:
             # try estimate: distance from navaid to routing start/end depending on direction
             try:
@@ -106,14 +131,14 @@ class IlsLlzDockWidget(QDockWidget):
             except Exception:
                 self._widget.spnA.setValue(0.0)
         # Other parameters
-        self._widget.spnB.setValue(float(defs.get("b", self._widget.spnB.value())))
-        self._widget.spnh.setValue(float(defs.get("h", self._widget.spnh.value())))
-        self._widget.spnD.setValue(float(defs.get("D", self._widget.spnD.value())))
-        self._widget.spnH.setValue(float(defs.get("H", self._widget.spnH.value())))
-        self._widget.spnL.setValue(float(defs.get("L", self._widget.spnL.value())))
-        self._widget.spnPhi.setValue(float(defs.get("phi", self._widget.spnPhi.value())))
-        if "r" in defs:
-            self._widget.spnr.setValue(float(defs["r"]))
+        self._widget.spnB.setValue(float(defs.b))
+        self._widget.spnh.setValue(float(defs.h))
+        self._widget.spnD.setValue(float(defs.D))
+        self._widget.spnH.setValue(float(defs.H))
+        self._widget.spnL.setValue(float(defs.L))
+        self._widget.spnPhi.setValue(float(defs.phi))
+        if defs.r is not None:
+            self._widget.spnr.setValue(float(defs.r))
         else:
             self._maybe_update_r()
 
@@ -163,11 +188,11 @@ class IlsLlzDockWidget(QDockWidget):
                     self._widget.cboNavaidLayer.setCurrentIndex(idx)
 
 
-    def get_parameters(self) -> Optional[Dict[str, Any]]:
+    def get_parameters(self) -> Optional[BRAParameters]:
         """Extract and validate all parameters from the UI.
         
         Returns:
-            Dictionary with all calculation parameters, or None if validation fails
+            BRAParameters object with all calculation parameters, or None if validation fails
         """
         navaid_layer = self._widget.cboNavaidLayer.currentData()
         routing_layer = self._widget.cboRoutingLayer.currentData()
@@ -248,20 +273,25 @@ class IlsLlzDockWidget(QDockWidget):
         base_name = custom_name if custom_name else remark
         display_name = f"{base_name} - {facility_label}" if facility_label else base_name
 
-        return {
-            "active_layer": navaid_layer,
-            "azimuth": azimuth,
-            "a": a,
-            "b": b,
-            "h": h,
-            "r": r,
-            "D": D,
-            "H": H,
-            "L": L,
-            "phi": phi,
-            "remark": remark,
-            "direction": direction,
-            "site_elev": site_elev,
-            "facility_key": facility_key,
-            "facility_label": facility_label,
-        }
+        try:
+            return BRAParameters(
+                active_layer=navaid_layer,
+                azimuth=azimuth,
+                a=a,
+                b=b,
+                h=h,
+                r=r,
+                D=D,
+                H=H,
+                L=L,
+                phi=phi,
+                site_elev=site_elev,
+                remark=remark,
+                direction=direction,
+                facility_key=facility_key,
+                facility_label=facility_label,
+                display_name=display_name,
+            )
+        except ValueError as e:
+            print(f"QBRA ILS/LLZ: Invalid parameters - {e}")
+            return None
