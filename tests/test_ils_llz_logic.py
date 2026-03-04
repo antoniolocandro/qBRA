@@ -83,7 +83,7 @@ class TestCreateFeature:
         # Verify geometry is set
         assert feature.hasGeometry()
 
-    def test_create_feature_ uses_facility_key_fallback(self):
+    def test_create_feature_uses_facility_key_fallback(self):
         """Test that facility_key is used when facility_label is empty."""
         from qBRA.models.bra_parameters import BRAParameters
         from qBRA.models.feature_definition import FeatureDefinition
