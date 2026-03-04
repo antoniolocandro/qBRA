@@ -79,3 +79,8 @@ site/
 .agent/
 .agents/
 .claude/
+
+#md
+README_DOCS.md
+REFACTORING_PLAN.md
+TIMELINE.md
