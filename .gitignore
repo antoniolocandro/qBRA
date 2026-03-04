@@ -79,7 +79,7 @@ site/
 .agent/
 .agents/
 .claude/
-
+skills-locks.json
 #md
 README_DOCS.md
 REFACTORING_PLAN.md
