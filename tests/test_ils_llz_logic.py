@@ -79,20 +79,18 @@ class TestCreateFeature:
         assert attrs[10] == "600.0"  # L
         assert attrs[11] == "30.0"  # phi
         assert attrs[12] == "ILS LLZ"  # type (facility_label)
-        
+
         # Verify geometry is set
         assert feature.hasGeometry()
 
-    def test_create_feature_uses_facility_key_fallback(self):
-        """Test that facility_key is used when facility_label is empty."""
+    def test_create_feature_uses_facility_label_as_type(self):
+        """Test that facility_label is correctly stored as type attribute."""
         from qBRA.models.bra_parameters import BRAParameters
         from qBRA.models.feature_definition import FeatureDefinition
         from qBRA.modules.ils_llz_logic import create_feature
-        
-        # Create mock layer
+
         mock_layer = Mock()
-        
-        # Create parameters with no facility_label
+
         params = BRAParameters(
             active_layer=mock_layer,
             azimuth=45.0,
@@ -105,13 +103,12 @@ class TestCreateFeature:
             L=600.0,
             phi=30.0,
             site_elev=200.0,
-            remark="RWY09",
+            remark="RWY27",
             direction="forward",
             facility_key="LOC",
-            facility_label="",  # Empty label
+            facility_label="ILS LLZ – single frequency",
         )
-        
-        # Create geometry
+
         points = [
             QgsPoint(0, 0, 0),
             QgsPoint(1, 0, 0),
@@ -119,8 +116,7 @@ class TestCreateFeature:
             QgsPoint(0, 0, 0),
         ]
         geometry = QgsGeometry(QgsPolygon(QgsLineString(points)))
-        
-        # Create definition
+
         definition = FeatureDefinition(
             id=1,
             area="wall",
@@ -128,13 +124,11 @@ class TestCreateFeature:
             area_name="Test Wall",
             geometry_points=points,
         )
-        
-        # Create feature
+
         feature = create_feature(definition, params, geometry)
-        
-        # Verify type attribute uses facility_key
+
         attrs = feature.attributes()
-        assert attrs[12] == "LOC"  # type fallback to facility_key
+        assert attrs[12] == "ILS LLZ – single frequency"
 
     def test_create_feature_rounds_a_and_r(self):
         """Test that 'a' and 'r' parameters are rounded to 2 decimal places."""
@@ -161,6 +155,7 @@ class TestCreateFeature:
             remark="RWY09",
             direction="forward",
             facility_key="GP",
+            facility_label="ILS GP M-Type",
         )
         
         # Create geometry

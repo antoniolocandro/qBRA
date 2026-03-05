@@ -3,18 +3,108 @@ Pytest configuration and fixtures for qBRA tests.
 
 This file contains shared fixtures and configuration for all tests.
 Fixtures are used to provide test data, mock objects, and setup/teardown logic.
+
+IMPORTANT: QGIS mock injection happens at module level (top of this file) so
+that all qBRA imports in test files succeed without a real QGIS installation.
 """
 
-import pytest
-from typing import Any, Dict
+import sys
 from unittest.mock import Mock, MagicMock
 
-# Import dataclass models for fixtures
+# ============================================================================
+# QGIS Mock — injected at module level so all qBRA test imports work
+# without a real QGIS installation.
+# ============================================================================
 try:
-    from qBRA.models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
-    MODELS_AVAILABLE = True
+    import qgis.core  # Only present in a full QGIS environment
 except ImportError:
-    MODELS_AVAILABLE = False
+    # --- Typed stubs ----------------------------------------------------------
+
+    class _QgsWkbTypes:
+        """Minimal WKB type constants and geometryType helper."""
+        Point = 1
+        MultiPoint = 4
+        LineString = 2
+        MultiLineString = 5
+        Polygon = 3
+        MultiPolygon = 6
+        PointGeometry = 0
+        LineGeometry = 1
+        PolygonGeometry = 2
+        UnknownGeometry = 3
+        NullGeometry = 4
+
+        @staticmethod
+        def geometryType(wkb_type: int) -> int:
+            _map = {
+                1: 0, 4: 0,   # Point  → PointGeometry
+                2: 1, 5: 1,   # Line   → LineGeometry
+                3: 2, 6: 2,   # Poly   → PolygonGeometry
+            }
+            return _map.get(wkb_type, 3)  # 3 = UnknownGeometry
+
+    class _QgsVectorLayer:
+        """Minimal vector layer stub — real class so isinstance() works."""
+        pass
+
+    class _QgsLayerTreeNode:
+        NodeLayer = 0
+        NodeGroup = 1
+
+    class _QgsFeature:
+        """Minimal QgsFeature stub that stores geometry and attributes."""
+        def __init__(self) -> None:
+            self._geometry: Any = None
+            self._attributes: list = []
+
+        def setGeometry(self, geom: Any) -> None:
+            self._geometry = geom
+
+        def setAttributes(self, attrs: list) -> None:
+            self._attributes = list(attrs)
+
+        def attributes(self) -> list:
+            return self._attributes
+
+        def hasGeometry(self) -> bool:
+            return self._geometry is not None
+
+        def geometry(self) -> Any:
+            return self._geometry
+
+    # --- Assemble mocked qgis.core module ------------------------------------
+    _core = MagicMock()
+    _core.QgsWkbTypes = _QgsWkbTypes
+    _core.QgsVectorLayer = _QgsVectorLayer
+    _core.QgsLayerTreeNode = _QgsLayerTreeNode
+    _core.QgsFeature = _QgsFeature
+
+    # --- PyQt stubs -----------------------------------------------------------
+    _pyqt_qtcore = MagicMock()
+    _pyqt_qtcore.Qt = MagicMock()
+    _pyqt_qtcore.pyqtSignal = MagicMock(return_value=MagicMock())
+    _pyqt_qtcore.QVariant = MagicMock()
+
+    # --- Inject into sys.modules (setdefault: skip if already present) -------
+    sys.modules.setdefault("qgis", MagicMock())
+    sys.modules.setdefault("qgis.core", _core)
+    sys.modules.setdefault("qgis.PyQt", MagicMock())
+    sys.modules.setdefault("qgis.PyQt.QtCore", _pyqt_qtcore)
+    sys.modules.setdefault("qgis.PyQt.QtGui", MagicMock())
+    sys.modules.setdefault("qgis.PyQt.QtWidgets", MagicMock())
+    sys.modules.setdefault("qgis.PyQt.uic", MagicMock())
+    sys.modules.setdefault("qgis.utils", MagicMock())
+
+# ============================================================================
+# Standard imports — must come AFTER sys.modules injection
+# ============================================================================
+import pytest
+from typing import Any, Dict
+
+# qBRA models are importable now that QGIS stubs are in sys.modules
+from qBRA.models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
+
+MODELS_AVAILABLE = True
 
 
 # ============================================================================
@@ -40,15 +130,21 @@ def mock_qgis_iface() -> Mock:
 @pytest.fixture
 def mock_qgs_vector_layer() -> Mock:
     """
-    Mock QgsVectorLayer object.
-    
+    Mock QgsVectorLayer object that passes isinstance(layer, QgsVectorLayer).
+
+    The ``__class__`` assignment is the standard approach to make a Mock
+    respond correctly to isinstance checks without requiring a real QGIS install.
+
     Returns:
         Mock vector layer with basic properties.
     """
+    from qgis.core import QgsVectorLayer, QgsWkbTypes
     layer = Mock()
+    layer.__class__ = QgsVectorLayer   # isinstance(layer, QgsVectorLayer) → True
     layer.name.return_value = "TestLayer"
     layer.selectedFeatures.return_value = []
     layer.fields.return_value = Mock()
+    layer.wkbType.return_value = QgsWkbTypes.Point
     return layer
 
 
@@ -78,9 +174,6 @@ def sample_bra_parameters():
     Returns:
         BRAParameters dataclass instance with valid calculation parameters.
     """
-    if not MODELS_AVAILABLE:
-        pytest.skip("qBRA models not available")
-    
     # Create a mock layer for testing
     mock_layer = Mock()
     mock_layer.name.return_value = "TestNavaidLayer"
@@ -108,13 +201,10 @@ def sample_bra_parameters():
 @pytest.fixture
 def sample_facility_config():
     """Sample facility configuration for testing.
-    
+
     Returns:
         FacilityConfig dataclass instance with defaults.
     """
-    if not MODELS_AVAILABLE:
-        pytest.skip("qBRA models not available")
-    
     return FacilityConfig(
         key="LOC",
         label="ILS LLZ – single frequency",

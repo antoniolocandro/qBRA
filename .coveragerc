@@ -1,0 +1,11 @@
+[run]
+omit =
+    qBRA/qbra_plugin.py
+    qBRA/dockwidgets/*
+
+[report]
+fail_under = 80
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    def __repr__

@@ -10,9 +10,9 @@ from qgis.PyQt.QtWidgets import QAction
 from qgis.core import Qgis, QgsProject, QgsVectorLayer
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
-from .modules.ils_llz_logic import build_layers
 from .models.bra_parameters import BRAParameters
 from .exceptions import BRACalculationError, LayerNotFoundError, UIOperationError
+from .workers.bra_worker import BRAWorker
 from .utils.logging_config import get_logger
 
 # Module logger
@@ -32,6 +32,7 @@ class QbraPlugin(QObject):
         self.iface: Any = iface
         self._action: Optional[QAction] = None
         self._dock: Optional[IlsLlzDockWidget] = None
+        self._worker: Optional[BRAWorker] = None
         self.plugin_dir: str = os.path.dirname(__file__)
         self._icon: QIcon = QIcon(os.path.join(self.plugin_dir, "icons", "qbra.svg"))
 
@@ -88,7 +89,7 @@ class QbraPlugin(QObject):
         self._dock.raise_()
 
     def _on_calculate(self) -> None:
-        """Handle calculate button click from dock widget."""
+        """Handle calculate button click — starts calculation on a background thread."""
         params: Optional[BRAParameters] = self._dock.get_parameters() if self._dock else None
         if not params:
             self.iface.messageBar().pushMessage(
@@ -97,27 +98,17 @@ class QbraPlugin(QObject):
                 level=Qgis.Warning
             )
             return
-        
-        try:
-            result_layer: Optional[QgsVectorLayer] = build_layers(self.iface, params)
-        except BRACalculationError as e:
-            # Specific calculation errors with user-friendly messages
-            logger.error("BRA calculation failed: %s", e.message, exc_info=True)
-            error_msg = f"Calculation error: {e.message}"
-            if e.details:
-                logger.debug("Calculation error details: %s", e.details)
-            self.iface.messageBar().pushMessage("QBRA", error_msg, level=Qgis.Critical)
-            return
-        except Exception as e:
-            # Unexpected errors - log with full traceback
-            logger.error("Unexpected error during BRA calculation: %s", e, exc_info=True)
-            self.iface.messageBar().pushMessage(
-                "QBRA",
-                f"Unexpected error: {type(e).__name__} - {e}",
-                level=Qgis.Critical
-            )
-            return
-        
+
+        self._dock.set_calculating(True)
+        self._worker = BRAWorker(self.iface, params, parent=self)
+        self._worker.finished.connect(self._on_calculation_finished)
+        self._worker.error.connect(self._on_calculation_error)
+        self._worker.finished.connect(lambda _: self._dock.set_calculating(False))
+        self._worker.error.connect(lambda _: self._dock.set_calculating(False))
+        self._worker.start()
+
+    def _on_calculation_finished(self, result_layer: Optional[QgsVectorLayer]) -> None:
+        """Receive the completed layer from BRAWorker and add it to the project."""
         if result_layer:
             QgsProject.instance().addMapLayer(result_layer)
             self.iface.messageBar().pushMessage(
@@ -125,3 +116,12 @@ class QbraPlugin(QObject):
                 "BRA areas created successfully",
                 level=Qgis.Success
             )
+
+    def _on_calculation_error(self, message: str) -> None:
+        """Receive an error message from BRAWorker and surface it to the user."""
+        logger.error("BRA calculation failed: %s", message)
+        self.iface.messageBar().pushMessage(
+            "QBRA",
+            f"Calculation error: {message}",
+            level=Qgis.Critical
+        )

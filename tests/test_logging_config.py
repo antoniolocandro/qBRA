@@ -28,7 +28,7 @@ class TestQGISLogHandler:
 
     @pytest.mark.skipif(not QGIS_AVAILABLE, reason="QGIS not available")
     @patch("qBRA.utils.logging_config.QGIS_AVAILABLE", True)
-    @patch("qgis.core.QgsMessageLog")
+    @patch("qBRA.utils.logging_config.QgsMessageLog")
     def test_emit_logs_to_qgis(self, mock_qgs_log):
         """Test that emit sends logs to QGIS MessageLog."""
         handler = QGISLogHandler()

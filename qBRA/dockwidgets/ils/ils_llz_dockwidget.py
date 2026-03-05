@@ -3,16 +3,18 @@ from typing import Any, Optional, Dict, Tuple
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
+from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea
 from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
 from qgis.utils import iface
 
 import os
 
-from ...models.bra_parameters import BRAParameters, FacilityConfig, FacilityDefaults
+from ...models.bra_parameters import BRAParameters, FacilityConfig
 from ...services.validation_service import ValidationService, ValidationError
 from ...services.layer_service import LayerService
 from ...exceptions import BRACalculationError
 from ...utils.logging_config import get_logger
+from ...config import FACILITY_REGISTRY
 
 # Module logger
 logger = get_logger(__name__)
@@ -40,7 +42,7 @@ class IlsLlzDockWidget(QDockWidget):
         self._validation_service = ValidationService()
         self._layer_service = LayerService(iface_)
         
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(LeftDockWidgetArea | RightDockWidgetArea)
         self.setObjectName("IlsLlzDockWidget")
         self._widget = uic.loadUi(UI_PATH)
         self.setWidget(self._widget)
@@ -54,7 +56,7 @@ class IlsLlzDockWidget(QDockWidget):
         Returns:
             The right dock widget area
         """
-        return Qt.RightDockWidgetArea
+        return RightDockWidgetArea
 
     def _wire(self) -> None:
         """Wire up UI signal connections."""
@@ -67,32 +69,7 @@ class IlsLlzDockWidget(QDockWidget):
 
     def _init_facility(self) -> None:
         """Initialize facility type dropdown with predefined configurations."""
-        self._facility_defs = {
-            "LOC": FacilityConfig(
-                key="LOC",
-                label="ILS LLZ – single frequency",
-                a_depends_on_threshold=True,
-                defaults=FacilityDefaults(b=500, h=70, D=500, H=10, L=2300, phi=30, r_expr="a+6000")
-            ),
-            "LOCII": FacilityConfig(
-                key="LOCII",
-                label="ILS LLZ – dual frequency",
-                a_depends_on_threshold=True,
-                defaults=FacilityDefaults(b=500, h=70, D=500, H=20, L=1500, phi=20, r_expr="a+6000")
-            ),
-            "GP": FacilityConfig(
-                key="GP",
-                label="ILS GP M-Type (dual)",
-                a_depends_on_threshold=False,
-                defaults=FacilityDefaults(a=800, b=50, h=70, D=250, H=5, L=325, phi=10, r=6000)
-            ),
-            "DME": FacilityConfig(
-                key="DME",
-                label="DME (directional)",
-                a_depends_on_threshold=True,
-                defaults=FacilityDefaults(b=20, h=70, D=600, H=20, L=1500, phi=40, r_expr="a+6000")
-            ),
-        }
+        self._facility_defs = FACILITY_REGISTRY
         cb = self._widget.cboFacility
         cb.clear()
         for key, config in self._facility_defs.items():
@@ -217,6 +194,11 @@ class IlsLlzDockWidget(QDockWidget):
             if idx >= 0:
                 self._widget.cboNavaidLayer.setCurrentIndex(idx)
 
+
+    def set_calculating(self, calculating: bool) -> None:
+        """Enable/disable the Calculate button during background calculation."""
+        self._widget.btnCalculate.setEnabled(not calculating)
+        self._widget.btnCalculate.setText("Calculating\u2026" if calculating else "Calculate")
 
     def get_parameters(self) -> Optional[BRAParameters]:
         """Extract and validate all parameters from the UI.
