@@ -9,14 +9,8 @@ from qgis.PyQt.QtWidgets import QAction
 from qgis.core import Qgis, QgsProject, QgsVectorLayer
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
-from .models.bra_parameters import BRAParameters
-from .exceptions import LayerNotFoundError
-from .workers.bra_worker import BRAWorker
-from .utils.logging_config import get_logger
-
-# Module logger
-logger = get_logger(__name__)
-
+from .modules.ils_llz_logic import build_layers, build_layers_omni
+import os
 
 class QbraPlugin(QObject):
     """Main plugin class for qBRA - Building Restriction Areas."""
@@ -98,6 +92,16 @@ class QbraPlugin(QObject):
 
         params: Optional[BRAParameters] = self._dock.get_parameters() if self._dock else None
         if not params:
+            self.iface.messageBar().pushMessage("QBRA", "Invalid inputs", level=Qgis.Warning)
+            return
+        try:
+            mode = params.get("mode", "directional")
+            if mode == "omni":
+                result_layer = build_layers_omni(self.iface, params)
+            else:
+                result_layer = build_layers(self.iface, params)
+        except Exception as exc:
+            self.iface.messageBar().pushMessage("QBRA", f"Error: {exc}", level=Qgis.Critical)
             return
 
         self._dock.set_calculating(True)
