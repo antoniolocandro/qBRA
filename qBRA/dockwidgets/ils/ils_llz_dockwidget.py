@@ -5,6 +5,7 @@ from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
 from qgis.utils import iface
 
 import os
+import re
 
 UI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ui", "ils", "ils_llz_panel.ui")
 
@@ -160,7 +161,7 @@ class IlsLlzDockWidget(QDockWidget):
         # Site elevation comes directly from UI numeric parameter
         site_elev = float(self._widget.spnSiteElev.value())
 
-        # Runway remark: try to find a sensible field, else use FID
+        # Runway remark: try to find a sensible field; default to RWYXX
         fields = navaid_layer.fields()
         rwy_field_candidates = ["runway", "rwy", "thr_rwy"]
         rwy_idx = -1
@@ -169,11 +170,31 @@ class IlsLlzDockWidget(QDockWidget):
             if idx >= 0:
                 rwy_idx = idx
                 break
+        def _format_runway(val):
+            s = str(val).strip().upper()
+            m = re.search(r"(?<!\d)(\d{1,2})([LRC])?", s)
+            if m:
+                try:
+                    num = int(m.group(1))
+                except Exception:
+                    return "RWYXX"
+                suffix = m.group(2) or ""
+                return f"RWY{num:02d}{suffix}"
+            # Could already be like 'RWY09' or 'RWY09L'
+            m2 = re.search(r"RWY\s*(\d{1,2})([LRC])?", s)
+            if m2:
+                try:
+                    num = int(m2.group(1))
+                except Exception:
+                    return "RWYXX"
+                suffix = m2.group(2) or ""
+                return f"RWY{num:02d}{suffix}"
+            return "RWYXX"
+
         if rwy_idx < 0:
-            # Fallback: use feature id as runway label
-            remark = f"RWY{feat.id()}"
+            remark = "RWYXX"
         else:
-            remark = f"RWY{attrs[rwy_idx]}"
+            remark = _format_runway(attrs[rwy_idx])
 
         # Compute azimuth from selected routing feature (as in legacy script)
         routing_sel = routing_layer.selectedFeatures()
@@ -211,10 +232,6 @@ class IlsLlzDockWidget(QDockWidget):
         facility_key = self._widget.cboFacility.currentData()
         facility_label = self._widget.cboFacility.currentText()
 
-        # Facility type (key) and label for naming
-        facility_key = self._widget.cboFacility.currentData()
-        facility_label = self._widget.cboFacility.currentText()
-
         # Output naming: user-provided name concatenated with facility label
         custom_name = (self._widget.txtOutputName.text() or "").strip()
         base_name = custom_name if custom_name else remark
@@ -236,4 +253,5 @@ class IlsLlzDockWidget(QDockWidget):
             "site_elev": site_elev,
             "facility_key": facility_key,
             "facility_label": facility_label,
+            "display_name": display_name,
         }

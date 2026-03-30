@@ -250,7 +250,7 @@ def build_layers(iface, params):
         7,
         "wall",
         str(side_elev),
-        remark,
+        display_name,
         str(round(a, 2)),
         str(b),
         str(h),
