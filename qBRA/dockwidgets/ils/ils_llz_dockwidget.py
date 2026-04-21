@@ -4,16 +4,16 @@ from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
 from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea, MsgWarning, MsgCritical
-from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
+from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer, QgsProject
 
 import os
+import re
 
-from ...models.bra_parameters import BRAParameters, FacilityConfig
+from ...models.bra_parameters import BRAParameters
 from ...services.validation_service import ValidationService, ValidationError
 from ...services.layer_service import LayerService
 from ...exceptions import BRACalculationError
 from ...utils.logging_config import get_logger
-from ...config import FACILITY_REGISTRY
 
 # Module logger
 logger = get_logger(__name__)
@@ -24,7 +24,8 @@ class IlsLlzDockWidget(QDockWidget):
     calculateRequested = pyqtSignal()
     closedRequested = pyqtSignal()
     
-    _facility_defs: Dict[str, FacilityConfig]
+    _facility_defs_dir: Dict[str, Tuple]
+    _facility_defs_omni: Dict[str, Tuple]
     _validation_service: ValidationService
     _layer_service: LayerService
 
@@ -46,7 +47,7 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget = uic.loadUi(UI_PATH)
         self.setWidget(self._widget)
         self._wire()
-        self._init_facility()
+        self._init_mode_and_facilities()
         self.refresh_layers()
 
     def defaultArea(self) -> Qt.DockWidgetArea:
@@ -66,28 +67,77 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.btnDirection.setProperty("direction", "forward")
         self._widget.btnDirection.setText("Direction: Start to End")
 
-    def _init_facility(self) -> None:
-        """Initialize facility type dropdown with predefined configurations."""
-        self._facility_defs = FACILITY_REGISTRY
-        cb = self._widget.cboFacility
-        cb.clear()
-        for key, config in self._facility_defs.items():
-            cb.addItem(config.label, key)
-        cb.currentIndexChanged.connect(self._apply_facility_defaults)
-        # Update r when A changes for types where r depends on a
+    def _init_mode_and_facilities(self):
+        # Directional facilities
+        self._facility_defs_dir = {
+            # key: (label, a_depends_threshold, defaults)
+            "LOC": ("ILS LLZ – single frequency", True, {"b": 500, "h": 70, "D": 500, "H": 10, "L": 2300, "phi": 30, "r_expr": "a+6000"}),
+            "LOCII": ("ILS LLZ – dual frequency", True, {"b": 500, "h": 70, "D": 500, "H": 20, "L": 1500, "phi": 20, "r_expr": "a+6000"}),
+            "GP": ("ILS GP M-Type (dual)", False, {"a": 800, "b": 50, "h": 70, "D": 250, "H": 5, "L": 325, "phi": 10, "r": 6000}),
+            "DME": ("DME (directional)", True, {"b": 20, "h": 70, "D": 600, "H": 20, "L": 1500, "phi": 40, "r_expr": "a+6000"}),
+        }
+        # Omnidirectional facilities presets (initial set)
+        self._facility_defs_omni = {
+            # key: (label, defaults for r, alpha, R, optional j/h)
+            "OMNI_DME_N": ("DME N (omnidirectional)", {"r": 300, "alpha": 1.0, "R": 3000}),
+            "OMNI_CVOR": ("CVOR (omnidirectional)", {"r": 600, "alpha": 1.0, "R": 3000, "j": 15000, "h": 52}),
+            "OMNI_DVOR": ("DVOR (omnidirectional)", {"r": 600, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
+            "OMNI_DF": ("Direction Finder (omnidirectional)", {"r": 500, "alpha": 1.0, "R": 3000, "j": 10000, "h": 52}),
+            "OMNI_MARKERS": ("Markers (omnidirectional)", {"r": 50, "alpha": 20.0, "R": 200}),
+            "OMNI_NDB": ("NDB (omnidirectional)", {"r": 200, "alpha": 5.0, "R": 1000}),
+            "OMNI_GBAS_REF": ("GBAS ground Reference receiver", {"r": 400, "alpha": 3.0, "R": 3000}),
+            "OMNI_GBAS_VDB": ("GBAS VDB station", {"r": 300, "alpha": 0.9, "R": 3000}),
+            "OMNI_VDB_MON": ("VDB station monitoring station", {"r": 400, "alpha": 3.0, "R": 3000}),
+            "OMNI_VHF_TX": ("VHF Communication Tx", {"r": 300, "alpha": 1.0, "R": 2000}),
+            "OMNI_VHF_RX": ("VHF Communication Rx", {"r": 300, "alpha": 1.0, "R": 2000}),
+            "OMNI_PSR": ("PSR (surveillance)", {"r": 500, "alpha": 0.25, "R": 15000}),
+            "OMNI_SSR": ("SSR (surveillance)", {"r": 500, "alpha": 0.25, "R": 15000}),
+        }
+
+        # connect handlers
+        self._widget.cboMode.currentIndexChanged.connect(self._on_mode_changed)
+        self._widget.cboFacility.currentIndexChanged.connect(self._on_facility_changed)
         self._widget.spnA.valueChanged.connect(self._maybe_update_r)
-        # Set initial
-        cb.setCurrentIndex(0)
-        self._apply_facility_defaults()
+        self._widget.chkOmniTurbine.toggled.connect(self._on_turbine_toggle)
+        # initialize
+        self._on_mode_changed()
+
+    def _on_mode_changed(self):
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        is_omni = mode_text.lower().startswith("omni")
+        # toggle parameter groups
+        self._widget.grpParameters.setVisible(not is_omni)
+        self._widget.grpOmniParameters.setVisible(is_omni)
+        # populate facilities
+        cb = self._widget.cboFacility
+        cb.blockSignals(True)
+        cb.clear()
+        if is_omni:
+            for key, (label, _defs) in self._facility_defs_omni.items():
+                cb.addItem(label, key)
+        else:
+            for key, (label, _dep, _defs) in self._facility_defs_dir.items():
+                cb.addItem(label, key)
+        cb.blockSignals(False)
+        # apply defaults for the initial selection
+        self._on_facility_changed()
+
+    def _on_turbine_toggle(self, checked):
+        self._set_turbine_fields(enabled=checked, reset=False)
+
+    def _on_facility_changed(self):
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        is_omni = mode_text.lower().startswith("omni")
+        if is_omni:
+            self._apply_omni_defaults()
+        else:
+            self._apply_facility_defaults()
 
     def _maybe_update_r(self) -> None:
         """Update r parameter based on facility type if it depends on a."""
         key = self._widget.cboFacility.currentData()
-        config = self._facility_defs.get(key)
-        if config is None:
-            return
-        
-        r_expr = config.defaults.r_expr
+        defs = self._facility_defs_dir.get(key, (None, False, {}))[2]
+        r_expr = defs.get("r_expr")
         if r_expr == "a+6000":
             a = float(self._widget.spnA.value())
             self._widget.spnr.setValue(a + 6000.0)
@@ -99,8 +149,10 @@ class IlsLlzDockWidget(QDockWidget):
             Estimated distance in metres, or 0.0 if layers/features are not ready.
         """
         try:
-            nlayer = self._widget.cboNavaidLayer.currentData()
-            rlayer = self._widget.cboRoutingLayer.currentData()
+            nlayer_id = self._widget.cboNavaidLayer.currentData()
+            rlayer_id = self._widget.cboRoutingLayer.currentData()
+            nlayer = QgsProject.instance().mapLayer(nlayer_id) if nlayer_id else None
+            rlayer = QgsProject.instance().mapLayer(rlayer_id) if rlayer_id else None
 
             if not nlayer or not rlayer:
                 return 0.0
@@ -138,32 +190,58 @@ class IlsLlzDockWidget(QDockWidget):
     def _apply_facility_defaults(self) -> None:
         """Apply default parameter values based on the selected facility type."""
         key = self._widget.cboFacility.currentData()
-        config = self._facility_defs.get(key)
-        if config is None:
+        entry = self._facility_defs_dir.get(key)
+        if entry is None:
             return
 
-        defs = config.defaults
+        _label, _a_dep, defs = entry
         # A: if explicitly present in defaults, set it; otherwise estimate from layers.
         # The estimation may return 0.0 on initial load (no layers yet) — that is fine.
-        if defs.a is not None:
-            self._widget.spnA.setValue(float(defs.a))
+        a_default = defs.get("a")
+        if a_default is not None:
+            self._widget.spnA.setValue(float(a_default))
         else:
             self._widget.spnA.setValue(self._estimate_a_from_layers())
 
         # Always apply all other facility defaults regardless of 'a' estimation outcome.
-        self._widget.spnB.setValue(float(defs.b))
-        self._widget.spnh.setValue(float(defs.h))
-        self._widget.spnD.setValue(float(defs.D))
-        self._widget.spnH.setValue(float(defs.H))
-        self._widget.spnL.setValue(float(defs.L))
-        self._widget.spnPhi.setValue(float(defs.phi))
-        if defs.r is not None:
-            self._widget.spnr.setValue(float(defs.r))
+        self._widget.spnB.setValue(float(defs["b"]))
+        self._widget.spnh.setValue(float(defs["h"]))
+        self._widget.spnD.setValue(float(defs["D"]))
+        self._widget.spnH.setValue(float(defs["H"]))
+        self._widget.spnL.setValue(float(defs["L"]))
+        self._widget.spnPhi.setValue(float(defs["phi"]))
+        r_default = defs.get("r")
+        if r_default is not None:
+            self._widget.spnr.setValue(float(r_default))
         else:
             self._maybe_update_r()
 
-    def _toggle_direction(self) -> None:
-        """Toggle routing direction between forward and backward."""
+    def _apply_omni_defaults(self):
+        key = self._widget.cboFacility.currentData()
+        defs = self._facility_defs_omni.get(key, ("", {}))[1]
+        self._widget.spnOmni_r.setValue(float(defs.get("r", 0)))
+        self._widget.spnOmni_alpha.setValue(float(defs.get("alpha", 1)))
+        self._widget.spnOmni_R.setValue(float(defs.get("R", 0)))
+        has_turbine = ("j" in defs and "h" in defs)
+        # block signal to avoid resetting user toggles when applying defaults
+        self._widget.chkOmniTurbine.blockSignals(True)
+        self._widget.chkOmniTurbine.setChecked(has_turbine)
+        self._widget.chkOmniTurbine.blockSignals(False)
+        self._set_turbine_fields(enabled=has_turbine, preset_j=defs.get("j"), preset_h=defs.get("h"), reset=True)
+
+    def _set_turbine_fields(self, enabled, preset_j=None, preset_h=None, reset=False):
+        self._widget.spnOmni_j.setEnabled(enabled)
+        self._widget.spnOmni_h.setEnabled(enabled)
+        if not enabled:
+            # keep values but make them inert when toggle is off
+            return
+        if reset:
+            if preset_j is not None:
+                self._widget.spnOmni_j.setValue(float(preset_j))
+            if preset_h is not None:
+                self._widget.spnOmni_h.setValue(float(preset_h))
+
+    def _toggle_direction(self):
         current = self._widget.btnDirection.property("direction") or "forward"
         new = "backward" if current == "forward" else "forward"
         self._widget.btnDirection.setProperty("direction", new)
@@ -177,24 +255,32 @@ class IlsLlzDockWidget(QDockWidget):
         """
         self._widget.cboNavaidLayer.clear()
         self._widget.cboRoutingLayer.clear()
-        
-        # Get layers from LayerService
-        point_layers = self._layer_service.get_point_layers()
-        line_layers = self._layer_service.get_line_layers()
-        
-        # Populate combos
-        for name, layer in line_layers:
-            self._widget.cboRoutingLayer.addItem(name, layer)
-        
-        for name, layer in point_layers:
-            self._widget.cboNavaidLayer.addItem(name, layer)
-        
+        # Collect layers via the layer tree to include layers inside groups
+        root = QgsProject.instance().layerTreeRoot()
+        def visit(node):
+            for child in node.children():
+                if child.nodeType() == child.NodeLayer:
+                    layer = child.layer()
+                    if not isinstance(layer, QgsVectorLayer):
+                        continue
+                    name = layer.name()
+                    gtype = QgsWkbTypes.geometryType(layer.wkbType())
+                    if gtype == QgsWkbTypes.LineGeometry:
+                        self._widget.cboRoutingLayer.addItem(name, layer.id())
+                    if gtype == QgsWkbTypes.PointGeometry:
+                        self._widget.cboNavaidLayer.addItem(name, layer.id())
+                elif child.nodeType() == child.NodeGroup:
+                    visit(child)
+        visit(root)
+
         # Default navaid: current active layer if it is a point layer
-        active_point = self._layer_service.get_default_point_layer()
-        if active_point:
-            idx = self._widget.cboNavaidLayer.findText(active_point.name())
-            if idx >= 0:
-                self._widget.cboNavaidLayer.setCurrentIndex(idx)
+        al = self.iface.activeLayer()
+        if al and isinstance(al, QgsVectorLayer):
+            gtype = QgsWkbTypes.geometryType(al.wkbType())
+            if gtype == QgsWkbTypes.PointGeometry:
+                idx = self._widget.cboNavaidLayer.findText(al.name())
+                if idx >= 0:
+                    self._widget.cboNavaidLayer.setCurrentIndex(idx)
 
 
     def set_calculating(self, calculating: bool) -> None:
@@ -202,49 +288,114 @@ class IlsLlzDockWidget(QDockWidget):
         self._widget.btnCalculate.setEnabled(not calculating)
         self._widget.btnCalculate.setText("Calculating\u2026" if calculating else "Calculate")
 
+    def is_omni_mode(self) -> bool:
+        """Return True if the current mode is omnidirectional."""
+        mode_text = self._widget.cboMode.currentText() or "Directional"
+        return mode_text.lower().startswith("omni")
+
+    def get_omni_parameters(self) -> Optional[dict]:
+        """Extract omnidirectional parameters from the UI.
+
+        Returns:
+            Dict with omni params, or None if no navaid layer/feature is selected.
+        """
+        navaid_layer_id = self._widget.cboNavaidLayer.currentData()
+        navaid_layer = QgsProject.instance().mapLayer(navaid_layer_id) if navaid_layer_id else None
+        if not navaid_layer:
+            self.iface.messageBar().pushMessage("QBRA", "No navaid layer selected", level=MsgWarning)
+            return None
+        if not navaid_layer.selectedFeatureCount():
+            self.iface.messageBar().pushMessage("QBRA", "No navaid feature selected", level=MsgWarning)
+            return None
+
+        site_elev = float(self._widget.spnSiteElev.value())
+        facility_key = self._widget.cboFacility.currentData()
+        facility_label = self._widget.cboFacility.currentText()
+        custom_name = (self._widget.txtOutputName.text() or "").strip()
+        display_name = (
+            f"{custom_name} - {facility_label}"
+            if custom_name and facility_label
+            else (custom_name or facility_label or "BRA")
+        )
+
+        return {
+            "active_layer": navaid_layer,
+            "site_elev": site_elev,
+            "facility_key": facility_key,
+            "facility_label": facility_label,
+            "display_name": display_name,
+            "omni_r": float(self._widget.spnOmni_r.value()),
+            "omni_alpha": float(self._widget.spnOmni_alpha.value()),
+            "omni_R": float(self._widget.spnOmni_R.value()),
+            "omni_turbine": bool(self._widget.chkOmniTurbine.isChecked()),
+            "omni_j": float(self._widget.spnOmni_j.value()),
+            "omni_h": float(self._widget.spnOmni_h.value()),
+        }
+
     def get_parameters(self) -> Optional[BRAParameters]:
         """Extract and validate all parameters from the UI.
-        
+
         Returns:
-            BRAParameters object with all calculation parameters, or None if validation fails
+            BRAParameters object with all calculation parameters, or None if validation fails.
         """
         try:
-            # Get layers from UI
-            navaid_layer = self._widget.cboNavaidLayer.currentData()
-            routing_layer = self._widget.cboRoutingLayer.currentData()
-            
+            # Resolve layer IDs to actual layer objects (combos store IDs since fix #24)
+            navaid_layer_id = self._widget.cboNavaidLayer.currentData()
+            routing_layer_id = self._widget.cboRoutingLayer.currentData()
+            navaid_layer = QgsProject.instance().mapLayer(navaid_layer_id) if navaid_layer_id else None
+            routing_layer = QgsProject.instance().mapLayer(routing_layer_id) if routing_layer_id else None
+
             # Validate layers using ValidationService
             self._validation_service.validate_layer_selected(navaid_layer, "navaid layer")
             self._validation_service.validate_layer_selected(routing_layer, "routing layer")
             self._validation_service.validate_feature_selected(navaid_layer, "navaid layer")
             self._validation_service.validate_feature_selected(routing_layer, "routing layer")
             self._validation_service.validate_geometry_vertices(routing_layer, min_vertices=2, layer_name="routing layer")
-            
+
             # Get selected features
             feat = navaid_layer.selectedFeatures()[0]
             attrs = feat.attributes()
-            
+
             # Site elevation comes directly from UI numeric parameter
             site_elev = float(self._widget.spnSiteElev.value())
-            
-            # Runway remark: use LayerService to find field
+
+            # Runway remark: find and normalize runway identifier
+            def _format_runway(val):
+                s = str(val).strip().upper()
+                m = re.search(r"(?<!\d)(\d{1,2})([LRC])?", s)
+                if m:
+                    try:
+                        num = int(m.group(1))
+                    except Exception:
+                        return "RWYXX"
+                    suffix = m.group(2) or ""
+                    return f"RWY{num:02d}{suffix}"
+                m2 = re.search(r"RWY\s*(\d{1,2})([LRC])?", s)
+                if m2:
+                    try:
+                        num = int(m2.group(1))
+                    except Exception:
+                        return "RWYXX"
+                    suffix = m2.group(2) or ""
+                    return f"RWY{num:02d}{suffix}"
+                return "RWYXX"
+
             rwy_idx = self._layer_service.find_field_index(navaid_layer, ["runway", "rwy", "thr_rwy"])
             if rwy_idx < 0:
-                # Fallback: use feature id as runway label
                 remark = f"RWY{feat.id()}"
             else:
-                remark = f"RWY{attrs[rwy_idx]}"
-            
+                remark = _format_runway(attrs[rwy_idx])
+
             # Compute azimuth from selected routing feature
             routing_feat = routing_layer.selectedFeatures()[0]
             geom = routing_feat.geometry()
-            
+
             # Get vertices based on geometry type
             if geom.isMultipart():
                 pts = geom.asMultiPolyline()[0]
             else:
                 pts = geom.asPolyline()
-            
+
             # Apply direction setting to routing points
             direction = self._widget.btnDirection.property("direction") or "forward"
             ordered_pts = pts if direction == "forward" else list(reversed(pts))
@@ -255,12 +406,12 @@ class IlsLlzDockWidget(QDockWidget):
             end_point = QgsPoint(p1.x(), p1.y())
             # QgsPoint.azimuth() returns [-180, 180]; normalize to [0, 360)
             azimuth = start_point.azimuth(end_point) % 360
-            
+
             logger.debug(
                 "Calculated azimuth from routing geometry: direction=%s, azimuth=%.2f, distance=%.2f",
                 direction, azimuth, geom.length()
             )
-            
+
             # Parameters come from UI (facility defaults applied on selection)
             a = float(self._widget.spnA.value())
             b = float(self._widget.spnB.value())
@@ -270,16 +421,16 @@ class IlsLlzDockWidget(QDockWidget):
             H = float(self._widget.spnH.value())
             L = float(self._widget.spnL.value())
             phi = float(self._widget.spnPhi.value())
-            
+
             # Facility type (key) and label
             facility_key = self._widget.cboFacility.currentData()
             facility_label = self._widget.cboFacility.currentText()
-            
+
             # Output naming: user-provided name concatenated with facility label
             custom_name = (self._widget.txtOutputName.text() or "").strip()
             base_name = custom_name if custom_name else remark
             display_name = f"{base_name} - {facility_label}" if facility_label else base_name
-            
+
             # Create BRAParameters (with built-in validation)
             return BRAParameters(
                 active_layer=navaid_layer,
@@ -299,7 +450,7 @@ class IlsLlzDockWidget(QDockWidget):
                 facility_label=facility_label,
                 display_name=display_name,
             )
-            
+
         except (ValidationError, ValueError) as e:
             logger.warning("Parameter validation failed: %s", e)
             self.iface.messageBar().pushMessage(

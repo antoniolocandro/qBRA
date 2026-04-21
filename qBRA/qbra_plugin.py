@@ -12,12 +12,12 @@ from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
 from .models.bra_parameters import BRAParameters
 from .exceptions import LayerNotFoundError
 from .workers.bra_worker import BRAWorker
+from .modules.ils_llz_logic import build_layers_omni
 from .utils.logging_config import get_logger
-from .utils.qt_compat import MsgSuccess, MsgCritical
+from .utils.qt_compat import MsgSuccess, MsgWarning, MsgCritical
 
 # Module logger
 logger = get_logger(__name__)
-
 
 class QbraPlugin(QObject):
     """Main plugin class for qBRA - Building Restriction Areas."""
@@ -93,11 +93,33 @@ class QbraPlugin(QObject):
         self._dock.raise_()
 
     def _on_calculate(self) -> None:
-        """Handle calculate button click — starts calculation on a background thread."""
+        """Handle calculate button click — dispatches to omni or directional calculation."""
         if self._worker and self._worker.isRunning():
             return  # BUG-02: ignore re-entrant calls while a calculation is in flight
 
-        params: Optional[BRAParameters] = self._dock.get_parameters() if self._dock else None
+        if not self._dock:
+            return
+
+        # Omni mode: synchronous calculation (simple geometry, no worker needed)
+        if self._dock.is_omni_mode():
+            omni_params = self._dock.get_omni_parameters()
+            if not omni_params:
+                return
+            try:
+                result_layer = build_layers_omni(self.iface, omni_params)
+                QgsProject.instance().addMapLayer(result_layer)
+                self.iface.messageBar().pushMessage(
+                    "QBRA", "BRA omni areas created successfully", level=MsgSuccess
+                )
+            except Exception as exc:
+                logger.error("Omni BRA calculation failed: %s", exc, exc_info=True)
+                self.iface.messageBar().pushMessage(
+                    "QBRA", f"Omni calculation error: {exc}", level=MsgCritical
+                )
+            return
+
+        # Directional mode: typed params + background worker
+        params: Optional[BRAParameters] = self._dock.get_parameters()
         if not params:
             return
 

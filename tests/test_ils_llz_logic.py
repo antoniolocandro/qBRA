@@ -1,7 +1,7 @@
 """Tests for ILS/LLZ logic functions."""
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 try:
     from qgis.core import QgsPoint, QgsGeometry, QgsPolygon, QgsLineString
@@ -183,3 +183,112 @@ class TestCreateFeature:
         attrs = feature.attributes()
         assert attrs[4] == "1234.57"  # a rounded
         assert attrs[7] == "7890.12"  # r rounded
+
+
+class TestBuildLayersOmni:
+    """Tests for build_layers_omni() function."""
+
+    def _make_iface(self, srid="EPSG:4326"):
+        iface = Mock()
+        iface.mapCanvas.return_value.mapSettings.return_value.destinationCrs.return_value.authid.return_value = srid
+        return iface
+
+    def _make_layer(self, x=0.0, y=0.0):
+        from qgis.core import QgsVectorLayer
+        feat = Mock()
+        pt = Mock()
+        pt.x.return_value = x
+        pt.y.return_value = y
+        geom = Mock()
+        geom.asPoint.return_value = pt
+        feat.geometry.return_value = geom
+        layer = Mock()
+        layer.__class__ = QgsVectorLayer
+        layer.selectedFeatures.return_value = [feat]
+        return layer
+
+    def test_raises_when_no_selection(self):
+        """Raises ValueError when active layer has no selected features."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        from qgis.core import QgsVectorLayer
+        layer = Mock()
+        layer.__class__ = QgsVectorLayer
+        layer.selectedFeatures.return_value = []
+        iface = self._make_iface()
+        with pytest.raises(ValueError, match="Select one feature"):
+            build_layers_omni(iface, {"active_layer": layer, "omni_r": 300, "omni_alpha": 1.0, "omni_R": 3000})
+
+    def test_raises_invalid_r_R(self):
+        """Raises ValueError when r=0 or R=0."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        with pytest.raises(ValueError, match="r and R must be > 0"):
+            build_layers_omni(iface, {"active_layer": layer, "omni_r": 0, "omni_alpha": 1.0, "omni_R": 3000})
+
+    def test_raises_when_R_less_than_r(self):
+        """Raises ValueError when R < r."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        with pytest.raises(ValueError, match="R must be >= r"):
+            build_layers_omni(iface, {"active_layer": layer, "omni_r": 500, "omni_alpha": 1.0, "omni_R": 100})
+
+    def test_raises_invalid_alpha(self):
+        """Raises ValueError for alpha outside (0, 90]."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        with pytest.raises(ValueError, match="alpha must be in"):
+            build_layers_omni(iface, {"active_layer": layer, "omni_r": 300, "omni_alpha": 0, "omni_R": 3000})
+
+    def test_raises_turbine_invalid_j_h(self):
+        """Raises ValueError when turbine=True but j or h is 0."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        with pytest.raises(ValueError, match="j and h must be > 0"):
+            build_layers_omni(iface, {
+                "active_layer": layer, "omni_r": 300, "omni_alpha": 1.0, "omni_R": 3000,
+                "omni_turbine": True, "omni_j": 0, "omni_h": 50,
+            })
+
+    def test_raises_turbine_j_less_than_r(self):
+        """Raises ValueError when j < r."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        with pytest.raises(ValueError, match="j must be >= r"):
+            build_layers_omni(iface, {
+                "active_layer": layer, "omni_r": 300, "omni_alpha": 1.0, "omni_R": 3000,
+                "omni_turbine": True, "omni_j": 100, "omni_h": 50,
+            })
+
+    def test_valid_params_no_turbine(self):
+        """Returns layer for valid params without turbine."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        mock_out = Mock()
+        with patch("qBRA.modules.ils_llz_logic.QgsVectorLayer", return_value=mock_out):
+            result = build_layers_omni(iface, {
+                "active_layer": layer, "omni_r": 300, "omni_alpha": 1.0, "omni_R": 3000,
+                "omni_turbine": False,
+                "display_name": "TEST",
+            })
+        assert result is mock_out
+
+    def test_valid_params_with_turbine(self):
+        """Returns layer for valid params with turbine."""
+        from qBRA.modules.ils_llz_logic import build_layers_omni
+        layer = self._make_layer()
+        iface = self._make_iface()
+        mock_out = Mock()
+        with patch("qBRA.modules.ils_llz_logic.QgsVectorLayer", return_value=mock_out):
+            result = build_layers_omni(iface, {
+                "active_layer": layer, "omni_r": 300, "omni_alpha": 1.0, "omni_R": 3000,
+                "omni_turbine": True, "omni_j": 500, "omni_h": 52,
+                "display_name": "TEST",
+            })
+        assert result is mock_out
+
