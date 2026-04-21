@@ -3,6 +3,7 @@
 [general]
 name=QBRA ILS/LLZ
 qgisMinimumVersion=3.0
+qgisMaximumVersion=4.99
 description=QBRA Plugin for QGIS - BRA areas for ILS/LLZ single frequency
 version=0.1.0
 author=andures

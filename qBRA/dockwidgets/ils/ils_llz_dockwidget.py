@@ -3,7 +3,7 @@ from typing import Any, Optional, Dict, Tuple
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtWidgets import QDockWidget
-from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea
+from ...utils.qt_compat import LeftDockWidgetArea, RightDockWidgetArea, MsgWarning, MsgCritical
 from qgis.core import QgsWkbTypes, QgsPoint, QgsVectorLayer
 
 import os
@@ -92,63 +92,65 @@ class IlsLlzDockWidget(QDockWidget):
             a = float(self._widget.spnA.value())
             self._widget.spnr.setValue(a + 6000.0)
 
+    def _estimate_a_from_layers(self) -> float:
+        """Estimate the 'a' parameter (navaid-to-threshold distance) from selected layers.
+
+        Returns:
+            Estimated distance in metres, or 0.0 if layers/features are not ready.
+        """
+        try:
+            nlayer = self._widget.cboNavaidLayer.currentData()
+            rlayer = self._widget.cboRoutingLayer.currentData()
+
+            if not nlayer or not rlayer:
+                return 0.0
+
+            if nlayer.selectedFeatureCount() == 0 or rlayer.selectedFeatureCount() == 0:
+                return 0.0
+
+            nfeat = nlayer.selectedFeatures()[0]
+            rfeat = rlayer.selectedFeatures()[0]
+            geom = rfeat.geometry()
+
+            pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
+            if not pts or len(pts) < 2:
+                raise BRACalculationError(
+                    "Routing geometry has insufficient vertices",
+                    f"Need at least 2 points, got {len(pts) if pts else 0}",
+                )
+
+            direction = self._widget.btnDirection.property("direction") or "forward"
+            pick = pts[0] if direction == "forward" else pts[-1]
+            # Both pick and npt are QgsPointXY — use QgsPointXY.distance() directly
+            npt = nfeat.geometry().asPoint()
+            return pick.distance(npt)
+
+        except BRACalculationError as e:
+            logger.warning("Could not estimate parameter 'a': %s", e.message)
+            return 0.0
+        except (AttributeError, IndexError, TypeError) as e:
+            logger.debug("Cannot estimate 'a' from geometry: %s", e)
+            return 0.0
+        except Exception as e:
+            logger.error("Unexpected error estimating 'a': %s", e, exc_info=True)
+            return 0.0
+
     def _apply_facility_defaults(self) -> None:
         """Apply default parameter values based on the selected facility type."""
         key = self._widget.cboFacility.currentData()
         config = self._facility_defs.get(key)
         if config is None:
             return
-        
+
         defs = config.defaults
-        # A: if explicitly present in defaults, set; if depends on threshold, try to estimate from routing start
+        # A: if explicitly present in defaults, set it; otherwise estimate from layers.
+        # The estimation may return 0.0 on initial load (no layers yet) — that is fine.
         if defs.a is not None:
             self._widget.spnA.setValue(float(defs.a))
         else:
-            # try estimate: distance from navaid to routing start/end depending on direction
-            try:
-                nlayer = self._widget.cboNavaidLayer.currentData()
-                rlayer = self._widget.cboRoutingLayer.currentData()
-                
-                if not nlayer or not rlayer:
-                    # No layers selected yet - set to 0 and let user adjust
-                    self._widget.spnA.setValue(0.0)
-                    return
-                
-                # Validate we have selected features
-                if nlayer.selectedFeatureCount() == 0 or rlayer.selectedFeatureCount() == 0:
-                    self._widget.spnA.setValue(0.0)
-                    return
-                
-                nfeat = nlayer.selectedFeatures()[0]
-                rfeat = rlayer.selectedFeatures()[0]
-                geom = rfeat.geometry()
-                
-                # Extract points from geometry
-                pts = geom.asMultiPolyline()[0] if geom.isMultipart() else geom.asPolyline()
-                if not pts or len(pts) < 2:
-                    raise BRACalculationError(
-                        "Routing geometry has insufficient vertices",
-                        f"Need at least 2 points, got {len(pts) if pts else 0}"
-                    )
+            self._widget.spnA.setValue(self._estimate_a_from_layers())
 
-                direction = self._widget.btnDirection.property("direction") or "forward"
-                pick = pts[0] if direction == "forward" else pts[-1]
-                a_val = QgsPoint(pick).distance(QgsPoint(nfeat.geometry().asPoint()))
-                self._widget.spnA.setValue(a_val)
-
-            except BRACalculationError as e:
-                # Specific geometry errors - log and set to 0
-                logger.warning("Could not estimate parameter 'a': %s", e.message)
-                self._widget.spnA.setValue(0.0)
-            except (AttributeError, IndexError, TypeError) as e:
-                # Expected errors when layers/features not properly set up yet
-                logger.debug("Cannot estimate 'a' from geometry: %s", e)
-                self._widget.spnA.setValue(0.0)
-            except Exception as e:
-                # Unexpected errors - log with full context
-                logger.error("Unexpected error estimating 'a': %s", e, exc_info=True)
-                self._widget.spnA.setValue(0.0)
-        # Other parameters
+        # Always apply all other facility defaults regardless of 'a' estimation outcome.
         self._widget.spnB.setValue(float(defs.b))
         self._widget.spnh.setValue(float(defs.h))
         self._widget.spnD.setValue(float(defs.D))
@@ -246,9 +248,13 @@ class IlsLlzDockWidget(QDockWidget):
             # Apply direction setting to routing points
             direction = self._widget.btnDirection.property("direction") or "forward"
             ordered_pts = pts if direction == "forward" else list(reversed(pts))
-            start_point = QgsPoint(ordered_pts[0])
-            end_point = QgsPoint(ordered_pts[-1])
-            azimuth = start_point.azimuth(end_point)
+            # QgsPoint(x, y) is required for azimuth(); QgsPointXY does not have azimuth()
+            p0 = ordered_pts[0]
+            p1 = ordered_pts[-1]
+            start_point = QgsPoint(p0.x(), p0.y())
+            end_point = QgsPoint(p1.x(), p1.y())
+            # QgsPoint.azimuth() returns [-180, 180]; normalize to [0, 360)
+            azimuth = start_point.azimuth(end_point) % 360
             
             logger.debug(
                 "Calculated azimuth from routing geometry: direction=%s, azimuth=%.2f, distance=%.2f",
@@ -299,7 +305,7 @@ class IlsLlzDockWidget(QDockWidget):
             self.iface.messageBar().pushMessage(
                 "QBRA",
                 str(e),
-                level=1,  # Qgis.Warning
+                level=MsgWarning,
             )
             return None
         except Exception as e:
@@ -307,6 +313,6 @@ class IlsLlzDockWidget(QDockWidget):
             self.iface.messageBar().pushMessage(
                 "QBRA",
                 f"Unexpected error: {e}",
-                level=2,  # Qgis.Critical
+                level=MsgCritical,
             )
             return None

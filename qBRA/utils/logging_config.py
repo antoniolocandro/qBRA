@@ -8,7 +8,8 @@ import logging
 from typing import Optional
 
 try:
-    from qgis.core import Qgis, QgsMessageLog
+    from qgis.core import QgsMessageLog
+    from .qt_compat import MsgInfo, MsgWarning, MsgCritical
     QGIS_AVAILABLE = True
 except ImportError:
     QGIS_AVAILABLE = False
@@ -45,14 +46,14 @@ class QGISLogHandler(logging.Handler):
         
         # Map Python logging levels to QGIS levels
         level_map = {
-            logging.DEBUG: Qgis.Info,
-            logging.INFO: Qgis.Info,
-            logging.WARNING: Qgis.Warning,
-            logging.ERROR: Qgis.Critical,
-            logging.CRITICAL: Qgis.Critical,
+            logging.DEBUG: MsgInfo,
+            logging.INFO: MsgInfo,
+            logging.WARNING: MsgWarning,
+            logging.ERROR: MsgCritical,
+            logging.CRITICAL: MsgCritical,
         }
         
-        qgis_level = level_map.get(record.levelno, Qgis.Info)
+        qgis_level = level_map.get(record.levelno, MsgInfo)
         message = self.format(record)
         
         try:

@@ -105,7 +105,7 @@ class BRAParameters:
     
     Attributes:
         active_layer: QGIS vector layer with navaid feature
-        azimuth: Direction angle in degrees (0-360)
+        azimuth: Direction angle in degrees (0–360, exclusive)
         a: Distance from navaid to threshold (meters)
         b: Distance behind threshold (meters)
         h: Maximum obstacle height (meters)
@@ -140,9 +140,9 @@ class BRAParameters:
     
     def __post_init__(self) -> None:
         """Validate BRA parameters and compute derived values."""
-        # Validate azimuth
+        # Validate azimuth (must be normalized to [0, 360) before construction)
         if not (0 <= self.azimuth < 360):
-            raise ValueError(f"azimuth must be in [0, 360), got {self.azimuth}")
+            raise ValueError(f"azimuth must be in [0, 360), got {self.azimuth} — normalize with '% 360' before passing")
         
         # Validate non-negative values
         if self.a < 0:

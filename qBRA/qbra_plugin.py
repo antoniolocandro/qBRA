@@ -6,13 +6,14 @@ import os
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import Qgis, QgsProject, QgsVectorLayer
+from qgis.core import QgsProject, QgsVectorLayer
 
 from .dockwidgets.ils.ils_llz_dockwidget import IlsLlzDockWidget
 from .models.bra_parameters import BRAParameters
 from .exceptions import LayerNotFoundError
 from .workers.bra_worker import BRAWorker
 from .utils.logging_config import get_logger
+from .utils.qt_compat import MsgSuccess, MsgCritical
 
 # Module logger
 logger = get_logger(__name__)
@@ -115,7 +116,7 @@ class QbraPlugin(QObject):
             self.iface.messageBar().pushMessage(
                 "QBRA",
                 "BRA areas created successfully",
-                level=Qgis.Success
+                level=MsgSuccess
             )
 
     def _on_calculation_error(self, message: str) -> None:
@@ -124,5 +125,5 @@ class QbraPlugin(QObject):
         self.iface.messageBar().pushMessage(
             "QBRA",
             f"Calculation error: {message}",
-            level=Qgis.Critical
+level=MsgCritical
         )
